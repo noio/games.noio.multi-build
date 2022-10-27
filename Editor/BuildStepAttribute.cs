@@ -1,0 +1,17 @@
+using System;
+
+public class BuildStepAttribute : Attribute
+{
+    public BuildStepAttribute(BuildStepOrder order, bool allowMultiple)
+    {
+        Order = order;
+        AllowMultiple = allowMultiple;
+    }
+
+    #region PROPERTIES
+
+    public BuildStepOrder Order { get; }
+    public bool AllowMultiple { get; }
+
+    #endregion
+}
