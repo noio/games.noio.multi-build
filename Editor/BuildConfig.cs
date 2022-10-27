@@ -4,13 +4,13 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEditor;
-using UnityEditor.AddressableAssets.Settings;
+// using UnityEditor.AddressableAssets.Settings;
 using UnityEditor.Build.Reporting;
 using UnityEngine;
 
 namespace Utils.Editor
 {
-    [CreateAssetMenu(menuName = "Utils/Build Config")]
+    [CreateAssetMenu(menuName = "Multi-Build Config")]
     public class BuildConfig : ScriptableObject
     {
         const string NotLoaded = ":NOT_LOADED:";
@@ -18,7 +18,7 @@ namespace Utils.Editor
         #region PUBLIC AND SERIALIZED FIELDS
 
         [SerializeField] string _outputFolder;
-        [SerializeField] string _customPath;
+        [SerializeField] string _customPath = "{date} {name}/{target}";
         [SerializeField] List<BuildTarget> _targets;
         [SerializeField] [SerializeReference] List<BuildStep> _steps;
 
@@ -115,11 +115,14 @@ namespace Utils.Editor
 
         public void Check()
         {
-            foreach (var buildStep in _steps)
+            if (_steps != null)
             {
-                if (buildStep.Active)
+                foreach (var buildStep in _steps)
                 {
-                    buildStep.CheckStep(this);
+                    if (buildStep.Active)
+                    {
+                        buildStep.CheckStep(this);
+                    }
                 }
             }
         }
@@ -180,7 +183,7 @@ namespace Utils.Editor
                         target);
                 }
 
-                AddressableAssetSettings.BuildPlayerContent();
+                // AddressableAssetSettings.BuildPlayerContent();
 
                 var path = GetPathForTarget(target);
 

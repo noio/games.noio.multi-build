@@ -2,7 +2,7 @@ using System.Collections;
 using System.ComponentModel;
 using System.Globalization;
 using System.Text.RegularExpressions;
-using UnityEngine.Localization.SmartFormat.Core.Parsing;
+// using UnityEngine.Localization.SmartFormat.Core.Parsing;
 
 /// <summary>
 ///     By:
