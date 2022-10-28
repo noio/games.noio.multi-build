@@ -8,7 +8,7 @@ using UnityEditor;
 using UnityEditor.Build.Reporting;
 using UnityEngine;
 
-namespace Utils.Editor
+namespace noio.MultiBuild
 {
     [CreateAssetMenu(menuName = "Multi-Build Config")]
     public class BuildConfig : ScriptableObject
@@ -68,7 +68,7 @@ namespace Utils.Editor
         /// <returns></returns>
         public string GetOutputFolder(out bool hasLocalOverride)
         {
-            if (OutputFolderOverride != null)
+            if (string.IsNullOrEmpty(OutputFolderOverride) == false)
             {
                 hasLocalOverride = true;
                 return OutputFolderOverride;
@@ -261,6 +261,11 @@ namespace Utils.Editor
         {
             var guid = AssetDatabase.GUIDFromAssetPath(AssetDatabase.GetAssetPath(this));
             return $"{nameof(BuildConfig)}.OverrideOutputFolder.{guid}";
+        }
+        string HasOutputFolderOverridePrefsKey()
+        {
+            var guid = AssetDatabase.GUIDFromAssetPath(AssetDatabase.GetAssetPath(this));
+            return $"{nameof(BuildConfig)}.HasOutputFolderOverride.{guid}";
         }
     }
 

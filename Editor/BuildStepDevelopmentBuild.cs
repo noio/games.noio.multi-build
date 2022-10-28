@@ -1,37 +1,39 @@
 using System;
 using UnityEditor;
 using UnityEngine;
-using Utils.Editor;
 
-[Serializable]
-[BuildStep(BuildStepOrder.PreBuild, false)]
-public class BuildStepDevelopmentBuild : BuildStep
+namespace noio.MultiBuild
 {
-    #region PUBLIC AND SERIALIZED FIELDS
-
-    [SerializeField] bool _scriptDebugging = true;
-    [SerializeField] bool _deepProfiling = true;
-    [SerializeField] bool _waitForManagedDebugger;
-
-    #endregion
-
-    protected override BuildStepResult Apply(BuildConfig buildConfig, BuildOptionWrapper options)
+    [Serializable]
+    [BuildStep(BuildStepOrder.PreBuild, false)]
+    public class BuildStepDevelopmentBuild : BuildStep
     {
-        Debug.Log($"Applying {this}");
+        #region PUBLIC AND SERIALIZED FIELDS
 
-        options.Options |= BuildOptions.Development;
-        if (_scriptDebugging)
+        [SerializeField] bool _scriptDebugging = true;
+        [SerializeField] bool _deepProfiling = true;
+        [SerializeField] bool _waitForManagedDebugger;
+
+        #endregion
+
+        protected override BuildStepResult Apply(BuildConfig buildConfig, BuildOptionWrapper options)
         {
-            options.Options |= BuildOptions.AllowDebugging;
+            Debug.Log($"Applying {this}");
+
+            options.Options |= BuildOptions.Development;
+            if (_scriptDebugging)
+            {
+                options.Options |= BuildOptions.AllowDebugging;
+            }
+
+            if (_deepProfiling)
+            {
+                options.Options |= BuildOptions.EnableDeepProfilingSupport;
+            }
+
+            EditorUserBuildSettings.waitForManagedDebugger = _waitForManagedDebugger;
+
+            return default;
         }
-
-        if (_deepProfiling)
-        {
-            options.Options |= BuildOptions.EnableDeepProfilingSupport;
-        }
-
-        EditorUserBuildSettings.waitForManagedDebugger = _waitForManagedDebugger;
-
-        return default;
     }
 }

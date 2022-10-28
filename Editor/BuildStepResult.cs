@@ -1,4 +1,4 @@
-namespace Utils.Editor
+namespace noio.MultiBuild
 {
     public readonly struct BuildStepResult
     {

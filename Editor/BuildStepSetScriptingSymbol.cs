@@ -4,9 +4,8 @@ using System.Linq;
 using UnityEditor;
 using UnityEditor.Build;
 using UnityEngine;
-using Utils.Editor;
 
-namespace Utils.MultiBuild.Editor
+namespace noio.MultiBuild
 {
     [Serializable]
     [BuildStep(BuildStepOrder.PreBuild, true)]

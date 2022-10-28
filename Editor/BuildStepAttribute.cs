@@ -1,17 +1,20 @@
 using System;
 
-public class BuildStepAttribute : Attribute
+namespace noio.MultiBuild
 {
-    public BuildStepAttribute(BuildStepOrder order, bool allowMultiple)
+    public class BuildStepAttribute : Attribute
     {
-        Order = order;
-        AllowMultiple = allowMultiple;
+        public BuildStepAttribute(BuildStepOrder order, bool allowMultiple)
+        {
+            Order = order;
+            AllowMultiple = allowMultiple;
+        }
+
+        #region PROPERTIES
+
+        public BuildStepOrder Order { get; }
+        public bool AllowMultiple { get; }
+
+        #endregion
     }
-
-    #region PROPERTIES
-
-    public BuildStepOrder Order { get; }
-    public bool AllowMultiple { get; }
-
-    #endregion
 }

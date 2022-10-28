@@ -7,7 +7,7 @@ using UnityEditor.Rendering;
 using UnityEditorInternal;
 using UnityEngine;
 
-namespace Utils.Editor
+namespace noio.MultiBuild
 {
     [CustomEditor(typeof(BuildConfig))]
     public class BuildConfigEditor : UnityEditor.Editor
