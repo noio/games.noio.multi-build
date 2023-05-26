@@ -10,7 +10,7 @@ using UnityEngine;
 namespace noio.MultiBuild
 {
     [CustomEditor(typeof(BuildConfig))]
-    public class BuildConfigEditor : UnityEditor.Editor
+    public class BuildConfigEditor : Editor
     {
         static readonly Lazy<GUIStyle> MiniButtonStyle = new(
             () => new GUIStyle(GUI.skin.button)
@@ -91,8 +91,8 @@ namespace noio.MultiBuild
                 {
                     EditorGUILayout.PropertyField(_customPath);
                     if (GUILayout.Button(EditorGUIUtility.IconContent("d__Help"),
-                        MiniButtonStyle.Value,
-                        GUILayout.Width(20), GUILayout.Height(20)))
+                            MiniButtonStyle.Value,
+                            GUILayout.Width(20), GUILayout.Height(20)))
                     {
                         _showHelp = !_showHelp;
                     }
@@ -136,7 +136,7 @@ namespace noio.MultiBuild
                     if (stepProperty.managedReferenceValue == null)
                     {
                         CoreEditorUtils.DrawHeaderFoldout(new GUIContent("Not Found"),
-                            true, false,
+                            true,
                             contextAction: v => OnContextClick(v, captureIdx));
 
                         EditorGUILayout.HelpBox(
@@ -213,7 +213,7 @@ namespace noio.MultiBuild
             using (var horizontalScope = new EditorGUILayout.HorizontalScope())
             {
                 if (EditorGUILayout.DropdownButton(new GUIContent("Add Pre-Build Step"), FocusType.Keyboard,
-                    EditorStyles.miniButton))
+                        EditorStyles.miniButton))
                 {
                     var rect = horizontalScope.rect;
                     ShowAddBuildStepPopup(rect, _steps, BuildStepOrder.PreBuild);
@@ -303,7 +303,7 @@ namespace noio.MultiBuild
             else
             {
                 menu.AddItem(EditorGUIUtility.TrTextContent("Move to Bottom"), false,
-                    () => MoveStep(index, (_steps.arraySize - 1)));
+                    () => MoveStep(index, _steps.arraySize - 1));
                 menu.AddItem(EditorGUIUtility.TrTextContent("Move Down"), false,
                     () => MoveStep(index, index + 1));
             }
@@ -392,7 +392,7 @@ namespace noio.MultiBuild
             foreach (var buildStepType in buildSteps)
             {
                 foreach (BuildStepAttribute attribute in
-                    buildStepType.GetCustomAttributes(typeof(BuildStepAttribute), true))
+                         buildStepType.GetCustomAttributes(typeof(BuildStepAttribute), true))
                 {
                     if ((attribute.Order | order) == attribute.Order &&
                         (attribute.AllowMultiple ||
@@ -433,7 +433,9 @@ namespace noio.MultiBuild
         {
             using (new EditorGUILayout.HorizontalScope())
             {
-                var folder = _buildConfig.GetOutputFolder(out var hasOverride);
+                var folder = _buildConfig.GetOutputFolder();
+                var hasOverride = _buildConfig.HasOutputFolderOverride;
+
                 if (DrawFolderSelectField(ref folder, new GUIContent("Output Folder")))
                 {
                     if (hasOverride)
@@ -454,12 +456,13 @@ namespace noio.MultiBuild
                 {
                     if (OpenFolderPanelRelativeToProject(ref folder))
                     {
+                        _buildConfig.HasOutputFolderOverride = true;
                         _buildConfig.OutputFolderOverride = folder;
                     }
                 }
                 else if (newOverride == false && hasOverride)
                 {
-                    _buildConfig.OutputFolderOverride = null;
+                    _buildConfig.HasOutputFolderOverride = false;
                 }
             }
         }
@@ -512,8 +515,8 @@ namespace noio.MultiBuild
                 {
                     GUILayout.Label("Use the following placeholders:", EditorStyles.boldLabel);
                     if (GUILayout.Button(EditorGUIUtility.IconContent("CrossIcon"),
-                        MiniButtonStyle.Value,
-                        GUILayout.Width(20), GUILayout.Height(20)))
+                            MiniButtonStyle.Value,
+                            GUILayout.Width(20), GUILayout.Height(20)))
                     {
                         _showHelp = !_showHelp;
                     }

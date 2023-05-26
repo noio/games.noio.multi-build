@@ -4,17 +4,17 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEditor;
-// using UnityEditor.AddressableAssets.Settings;
 using UnityEditor.Build.Reporting;
 using UnityEngine;
+using UnityEngine.Assertions;
+
+// using UnityEditor.AddressableAssets.Settings;
 
 namespace noio.MultiBuild
 {
     [CreateAssetMenu(menuName = "Multi-Build Config")]
     public class BuildConfig : ScriptableObject
     {
-        const string NotLoaded = ":NOT_LOADED:";
-
         #region PUBLIC AND SERIALIZED FIELDS
 
         [SerializeField] string _outputFolder;
@@ -24,11 +24,27 @@ namespace noio.MultiBuild
 
         #endregion
 
-        string _outputFolderOverride = NotLoaded;
+        bool _didLoadEditorPrefs;
+        bool _hasOutputFolderOverride;
+        string _outputFolderOverride;
 
         #region PROPERTIES
 
         public IReadOnlyList<BuildTarget> Targets => _targets;
+
+        public bool HasOutputFolderOverride
+        {
+            get
+            {
+                LoadEditorPrefs();
+                return _hasOutputFolderOverride;
+            }
+            set
+            {
+                _hasOutputFolderOverride = value;
+                EditorPrefs.SetBool(HasOutputFolderOverridePrefsKey(), value);
+            }
+        }
 
         /// <summary>
         ///     Returns a folder path if it was set on this local machine.
@@ -38,24 +54,16 @@ namespace noio.MultiBuild
         {
             get
             {
-                if (_outputFolderOverride == NotLoaded)
-                {
-                    _outputFolderOverride = EditorPrefs.GetString(OutputFolderOverridePrefsKey(), "");
-                }
-
+                LoadEditorPrefs();
                 return _outputFolderOverride;
             }
             set
             {
+                Assert.IsTrue(HasOutputFolderOverride,
+                    "Set HasOutputFolderOverride to true before setting the path");
+
                 _outputFolderOverride = value;
-                if (string.IsNullOrEmpty(value))
-                {
-                    EditorPrefs.DeleteKey(OutputFolderOverridePrefsKey());
-                }
-                else
-                {
-                    EditorPrefs.SetString(OutputFolderOverridePrefsKey(), value);
-                }
+                EditorPrefs.SetString(OutputFolderOverridePrefsKey(), value);
             }
         }
 
@@ -64,23 +72,15 @@ namespace noio.MultiBuild
         /// <summary>
         ///     Return the target output folder, which is possibly the local override value
         /// </summary>
-        /// <param name="hasLocalOverride"></param>
         /// <returns></returns>
-        public string GetOutputFolder(out bool hasLocalOverride)
+        public string GetOutputFolder()
         {
-            if (string.IsNullOrEmpty(OutputFolderOverride) == false)
-            {
-                hasLocalOverride = true;
-                return OutputFolderOverride;
-            }
-
-            hasLocalOverride = false;
-            return _outputFolder;
+            return HasOutputFolderOverride ? _outputFolderOverride : _outputFolder;
         }
 
         public string GetPathForTarget(BuildTarget target)
         {
-            var path = Path.GetFullPath(Path.Combine(Application.dataPath, GetOutputFolder(out _)));
+            var path = Path.GetFullPath(Path.Combine(Application.dataPath, GetOutputFolder()));
 
             var data = new Hashtable
             {
@@ -257,15 +257,34 @@ namespace noio.MultiBuild
             return File.Exists(path) || Directory.Exists(path + ".app") || Directory.Exists(path);
         }
 
+        void LoadEditorPrefs()
+        {
+            if (_didLoadEditorPrefs == false)
+            {
+                _hasOutputFolderOverride = EditorPrefs.GetBool(HasOutputFolderOverridePrefsKey(), false);
+                _outputFolderOverride = EditorPrefs.GetString(OutputFolderOverridePrefsKey(), "../../builds");
+                _didLoadEditorPrefs = true;
+            }
+        }
+
         string OutputFolderOverridePrefsKey()
         {
+            return GetPrefsKey("OutputFolderOverride");
             var guid = AssetDatabase.GUIDFromAssetPath(AssetDatabase.GetAssetPath(this));
             return $"{nameof(BuildConfig)}.OverrideOutputFolder.{guid}";
         }
+
         string HasOutputFolderOverridePrefsKey()
         {
+            return GetPrefsKey("HasOutputFolderOverride");
             var guid = AssetDatabase.GUIDFromAssetPath(AssetDatabase.GetAssetPath(this));
             return $"{nameof(BuildConfig)}.HasOutputFolderOverride.{guid}";
+        }
+
+        string GetPrefsKey(string key)
+        {
+            var guid = AssetDatabase.GUIDFromAssetPath(AssetDatabase.GetAssetPath(this));
+            return $"{nameof(BuildConfig)}.{key}.{guid}";
         }
     }
 
@@ -277,7 +296,6 @@ namespace noio.MultiBuild
 
         #endregion
     }
-
 }
 
 //   __              __      __  ___  __  __      __        _    __   __
