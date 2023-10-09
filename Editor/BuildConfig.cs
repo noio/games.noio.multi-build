@@ -12,7 +12,7 @@ using UnityEngine.Assertions;
 
 namespace noio.MultiBuild
 {
-    [CreateAssetMenu(menuName = "Multi-Build Config")]
+    [CreateAssetMenu(menuName = "Noio/Multi-Build Config")]
     public class BuildConfig : ScriptableObject
     {
         #region PUBLIC AND SERIALIZED FIELDS

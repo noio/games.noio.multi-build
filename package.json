@@ -1,6 +1,6 @@
 {
     "name": "games.noio.multibuild",
-    "version": "0.1.1",
+    "version": "0.1.2",
     "displayName": "MultiBuild",
     "description": "Group build targets, settings and pre-build steps! Build with one button!",
     "unity": "2022.2",
