@@ -148,10 +148,6 @@ namespace noio.MultiBuild
                 return;
             }
 
-            if (int.TryParse(PlayerSettings.iOS.buildNumber, out var buildNum))
-            {
-                PlayerSettings.iOS.buildNumber = (buildNum + 1).ToString();
-            }
 
             //    _    __   __              __              __      __  ___  __  __   __
             //   /_\  |__) |__) |   \_/    |__) |  | | |   |  \    (__'  |  |__ |__) (__'
@@ -172,6 +168,10 @@ namespace noio.MultiBuild
                     (targetsInOrder[currentTargetIdx], targetsInOrder[0]);
             }
 
+            //  __   __      __              __ 
+            // |  \ /  \    |__) |  | | |   |  \
+            // |__/ \__/    |__) \__/ | |__ |__/
+            //
             /*
              * Do the actual builds
              */
@@ -218,6 +218,15 @@ namespace noio.MultiBuild
                 Debug.Log(
                     $"[{timeStamp}] <b><color=#{color}>Build {target} v{Application.version} successful!</color></b> ({buildTime:.0}s) {buildSize}MB. At {path}");
                 EditorUtility.ClearProgressBar();
+            }
+            
+            
+            /*
+             * Increment Build Number AFTERWARDS (so that paths are not messed up)
+             */
+            if (int.TryParse(PlayerSettings.iOS.buildNumber, out var buildNum))
+            {
+                PlayerSettings.iOS.buildNumber = (buildNum + 1).ToString();
             }
 
             /*
