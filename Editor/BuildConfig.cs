@@ -217,10 +217,13 @@ public class BuildConfig : ScriptableObject
             var buildSize = report.summary.totalSize / 1024 / 1024;
             var timeStamp = DateTime.Now.ToString("HH:mm");
             var color = ColorUtility.ToHtmlStringRGB(new Color(0.6f, 1f, 0.58f));
-            var message =
-                $"[{timeStamp}] <b><color=#{color}>Build {target} v{Application.version} successful!</color></b> ({buildTime:.0}s) {buildSize}MB. At {path}";
-            Debug.Log(message);
-            successLogs.Add(message);
+            
+            /*
+             * Log a short message, log full message later
+             */
+            Debug.Log($"Build {target} v{Application.version} successful!");
+            successLogs.Add($"[{timeStamp}] <b><color=#{color}>Build {target} v{Application.version} successful!</color></b> ({buildTime:.0}s) {buildSize}MB. At {path}");
+            
             EditorUtility.ClearProgressBar();
         }
 
