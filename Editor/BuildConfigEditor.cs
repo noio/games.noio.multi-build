@@ -62,6 +62,23 @@ namespace noio.MultiBuild
         }
 
         #endregion
+        static void IncrementVersion()
+        {
+            var currentVersion = Application.version;
+
+            var lastDot = currentVersion.LastIndexOf('.');
+            if (lastDot != -1 && int.TryParse(currentVersion.Substring(lastDot + 1), out var patchNumber))
+            {
+                patchNumber++;
+                var newVersion = currentVersion.Substring(0, lastDot + 1) + patchNumber;
+                PlayerSettings.bundleVersion = newVersion;
+                Debug.Log($"Version updated to: {newVersion}");
+            }
+            else
+            {
+                Debug.LogWarning($"Can't increment version \"{currentVersion}\".");
+            }
+        }
 
         public override void OnInspectorGUI()
         {
@@ -94,8 +111,14 @@ namespace noio.MultiBuild
                             MiniButtonStyle.Value,
                             GUILayout.Width(20), GUILayout.Height(20)))
                     {
-                        _showHelp = !_showHelp;
+                        _showHelp = !_showHelp;                                                 
                     }
+                }
+
+                EditorGUILayout.Space();
+                if (GUILayout.Button($"Increment Version (Current: {Application.version})", GUILayout.Height(30)))
+                {
+                    IncrementVersion();
                 }
 
                 if (changes.changed)
