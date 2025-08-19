@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
@@ -16,10 +17,13 @@ namespace noio.MultiBuild
 
         #endregion
 
-        protected override BuildStepResult Apply(BuildConfig buildConfig, BuildOptionWrapper options)
+        public override void Validate(BuildConfig buildConfig, List<BuildStepMessage> messages)
         {
-            Debug.Log($"Applying {this}");
+            
+        }
 
+        public override void Apply(BuildConfig buildConfig, BuildOptionWrapper options)
+        {
             options.Options |= BuildOptions.Development;
             if (_scriptDebugging)
             {
@@ -33,7 +37,6 @@ namespace noio.MultiBuild
 
             EditorUserBuildSettings.waitForManagedDebugger = _waitForManagedDebugger;
 
-            return default;
         }
     }
 }

@@ -23,7 +23,7 @@ public class BuildConfig : ScriptableObject
     [SerializeField] string _outputFolder;
     [SerializeField] string _customPath = "{date} {name}/{target}";
     [SerializeField] List<BuildTarget> _targets;
-    [SerializeField] [SerializeReference] List<BuildStep> _steps;
+    [SerializeField] List<BuildStep> _steps;
 
     #endregion
 
@@ -116,19 +116,19 @@ public class BuildConfig : ScriptableObject
         return path;
     }
 
-    public void Check()
-    {
-        if (_steps != null)
-        {
-            foreach (var buildStep in _steps)
-            {
-                if (buildStep.Active)
-                {
-                    buildStep.CheckStep(this);
-                }
-            }
-        }
-    }
+    // public void Check()
+    // {
+    //     if (_steps != null)
+    //     {
+    //         foreach (var buildStep in _steps)
+    //         {
+    //             if (buildStep.Active)
+    //             {
+    //                 buildStep.CheckStep(this);
+    //             }
+    //         }
+    //     }
+    // }
 
     public void Build()
     {
@@ -264,7 +264,7 @@ public class BuildConfig : ScriptableObject
         {
             if (buildStep.Active)
             {
-                buildStep.ApplyStep(this, options);
+                buildStep.Apply(this, options);
             }
         }
 
@@ -322,11 +322,6 @@ public class BuildOptionWrapper
     #endregion
 }
 }
-
-//   __              __      __  ___  __  __      __        _    __   __
-//  |__) |  | | |   |  \    (__'  |  |__ |__)    /  ` |    /_\  (__' (__'
-//  |__) \__/ | |__ |__/    .__)  |  |__ |       \__, |__ /   \ .__) .__)
-//
 
 public static class EnumAttributeExtension
 {
