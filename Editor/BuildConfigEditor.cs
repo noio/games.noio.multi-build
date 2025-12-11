@@ -191,13 +191,13 @@ public class BuildConfigEditor : Editor
         //  |__) |  | | |   |  \    |__) |  |  |   |  /  \ |\ |
         //  |__) \__/ | |__ |__/    |__) \__/  |   |  \__/ | \|
         //
-        GUILayout.Space(20);
-        if (GUILayout.Button("Re-Validate"))
-        {
-            ValidateAll();
-        }
-        
-        GUILayout.Space(10);
+        // GUILayout.Space(20);
+        // if (GUILayout.Button("Re-Validate"))
+        // {
+        //     ValidateAll();
+        // }
+        //
+        GUILayout.Space(40);
         var hasAnyErrors = _stepEntries.Any(entry =>
             entry.IsValid && entry.Messages.Any(msg => msg.Severity == Severity.Error));
         using (new EditorGUI.DisabledScope(hasAnyErrors))
@@ -213,6 +213,28 @@ public class BuildConfigEditor : Editor
                 if (GUILayout.Button("Build", GUILayout.Height(50)))
                 {
                     _buildConfig.Build();
+                }
+
+                var currentTarget = EditorUserBuildSettings.activeBuildTarget;
+                var isCurrentTargetIncluded = _buildConfig.Targets.Contains(currentTarget);
+
+                using (new EditorGUI.DisabledScope(!isCurrentTargetIncluded))
+                {
+                    if (GUILayout.Button("Build & Run", GUILayout.Width(120), GUILayout.Height(50)))
+                    {
+                        _buildConfig.Build();
+                        var buildPath = _buildConfig.GetPathForTarget(currentTarget);
+                        var execPath = GetExecutablePath(buildPath, currentTarget);
+                        if (string.IsNullOrEmpty(execPath) == false && (File.Exists(execPath) || Directory.Exists(execPath)))
+                        {
+                            Debug.Log($"Running build at: {execPath}");
+                            System.Diagnostics.Process.Start(execPath);
+                        }
+                        else
+                        {
+                            Debug.LogError($"Build not found at: {execPath}");
+                        }
+                    }
                 }
             }
         }
@@ -749,6 +771,25 @@ public class BuildConfigEditor : Editor
         }
 
         return false;
+    }
+
+    static string GetExecutablePath(string buildPath, BuildTarget target)
+    {
+        switch (target)
+        {
+            case BuildTarget.StandaloneWindows:
+            case BuildTarget.StandaloneWindows64:
+                return buildPath.EndsWith(".exe") ? buildPath : buildPath + ".exe";
+
+            case BuildTarget.StandaloneOSX:
+                return buildPath.EndsWith(".app") ? buildPath : buildPath + ".app";
+
+            case BuildTarget.StandaloneLinux64:
+                return buildPath;
+
+            default:
+                return buildPath;
+        }
     }
 
     #endregion
