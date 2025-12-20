@@ -130,7 +130,7 @@ public class BuildConfig : ScriptableObject
     //     }
     // }
 
-    public void Build()
+    public bool Build()
     {
         /*
          * Check if builds will be overwritten, and confirm with user
@@ -148,7 +148,7 @@ public class BuildConfig : ScriptableObject
         if (confirmBuild == false)
         {
             Debug.LogWarning("Building Cancelled");
-            return;
+            return false;
         }
 
         //    _    __   __              __              __      __  ___  __  __   __
@@ -177,6 +177,7 @@ public class BuildConfig : ScriptableObject
         /*
          * Do the actual builds
          */
+        bool allBuildsSucceeded = true;
         var successLogs = new List<string>();
         foreach (var target in targetsInOrder)
         {
@@ -210,6 +211,7 @@ public class BuildConfig : ScriptableObject
             {
                 Debug.LogError($"Aborting builds because {target} had error");
                 Debug.Log(report.summary.ToString());
+                allBuildsSucceeded = false;
                 break;
             }
 
@@ -254,6 +256,8 @@ public class BuildConfig : ScriptableObject
         {
             Debug.Log(message);
         }
+        
+        return allBuildsSucceeded;
     }
 
     public BuildOptionWrapper ApplyBuildSteps()

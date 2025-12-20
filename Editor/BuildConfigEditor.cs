@@ -222,17 +222,21 @@ public class BuildConfigEditor : Editor
                 {
                     if (GUILayout.Button("Build & Run", GUILayout.Width(120), GUILayout.Height(50)))
                     {
-                        _buildConfig.Build();
-                        var buildPath = _buildConfig.GetPathForTarget(currentTarget);
-                        var execPath = GetExecutablePath(buildPath, currentTarget);
-                        if (string.IsNullOrEmpty(execPath) == false && (File.Exists(execPath) || Directory.Exists(execPath)))
+                        var success = _buildConfig.Build();
+
+                        if (success)
                         {
-                            Debug.Log($"Running build at: {execPath}");
-                            System.Diagnostics.Process.Start(execPath);
-                        }
-                        else
-                        {
-                            Debug.LogError($"Build not found at: {execPath}");
+                            var buildPath = _buildConfig.GetPathForTarget(currentTarget);
+                            var execPath = GetExecutablePath(buildPath, currentTarget);
+                            if (string.IsNullOrEmpty(execPath) == false && (File.Exists(execPath) || Directory.Exists(execPath)))
+                            {
+                                Debug.Log($"Running build at: {execPath}");
+                                System.Diagnostics.Process.Start(execPath);
+                            }
+                            else
+                            {
+                                Debug.LogError($"Build not found at: {execPath}");
+                            }
                         }
                     }
                 }
