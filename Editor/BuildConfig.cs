@@ -1,4 +1,4 @@
-// (C)2024 @noio_games
+// (C)2026 @noio_games
 // Thomas van den Berg
 
 using System;
@@ -8,6 +8,7 @@ using System.IO;
 using System.Linq;
 using UnityEditor;
 using UnityEditor.Build.Reporting;
+using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.Assertions;
 
@@ -151,6 +152,15 @@ public class BuildConfig : ScriptableObject
             return false;
         }
 
+        /*
+         * Prompt user to save modified scenes
+         */
+        if (EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo() == false)
+        {
+            Debug.LogWarning("Building Cancelled");
+            return false;
+        }
+
         //    _    __   __              __              __      __  ___  __  __   __
         //   /_\  |__) |__) |   \_/    |__) |  | | |   |  \    (__'  |  |__ |__) (__'
         //  /   \ |    |    |__  |     |__) \__/ | |__ |__/    .__)  |  |__ |    .__)
@@ -177,7 +187,7 @@ public class BuildConfig : ScriptableObject
         /*
          * Do the actual builds
          */
-        bool allBuildsSucceeded = true;
+        var allBuildsSucceeded = true;
         var successLogs = new List<string>();
         foreach (var target in targetsInOrder)
         {
@@ -219,13 +229,14 @@ public class BuildConfig : ScriptableObject
             var buildSize = report.summary.totalSize / 1024 / 1024;
             var timeStamp = DateTime.Now.ToString("HH:mm");
             var color = ColorUtility.ToHtmlStringRGB(new Color(0.6f, 1f, 0.58f));
-            
+
             /*
              * Log a short message, log full message later
              */
             Debug.Log($"Build {target} v{Application.version} successful!");
-            successLogs.Add($"[{timeStamp}] <b><color=#{color}>Build {target} v{Application.version} successful!</color></b> ({buildTime:.0}s) {buildSize}MB. At {path}");
-            
+            successLogs.Add(
+                $"[{timeStamp}] <b><color=#{color}>Build {target} v{Application.version} successful!</color></b> ({buildTime:.0}s) {buildSize}MB. At {path}");
+
             EditorUtility.ClearProgressBar();
         }
 
@@ -256,7 +267,7 @@ public class BuildConfig : ScriptableObject
         {
             Debug.Log(message);
         }
-        
+
         return allBuildsSucceeded;
     }
 
