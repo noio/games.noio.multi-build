@@ -6,8 +6,7 @@ using UnityEngine;
 namespace noio.MultiBuild
 {
     [Serializable]
-    [BuildStep(BuildStepOrder.PreBuild, false)]
-    public class BuildStepDevelopmentBuild : BuildStep
+    public class BuildStepDevelopmentBuild : PreBuildStep
     {
         #region PUBLIC AND SERIALIZED FIELDS
 
@@ -17,9 +16,9 @@ namespace noio.MultiBuild
 
         #endregion
 
-        public override void Validate(BuildConfig buildConfig, List<BuildStepMessage> messages)
+        protected override void Validate(BuildConfig buildConfig)
         {
-            
+
         }
 
         public override void Apply(BuildConfig buildConfig, BuildOptionWrapper options)

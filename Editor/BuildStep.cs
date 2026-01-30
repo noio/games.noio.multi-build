@@ -33,24 +33,27 @@ public abstract class BuildStep : ScriptableObject
         }
     }
 
+    public List<BuildStepValidationResult> ValidationResults { get; } = new();
+
     #endregion
 
     /// <summary>
-    ///     Validate the prerequisites for this build step.
-    ///     If this returns one or more messages with ERROR state,
-    ///     the build button is disabled.
+    ///     Runs validation by clearing ValidationResults and calling Validate.
+    ///     Called by the editor to check prerequisites before building.
     /// </summary>
     /// <param name="buildConfig"></param>
-    /// <returns></returns>
-    public abstract void Validate(BuildConfig buildConfig, List<BuildStepMessage> messages);
+    public void RunValidation(BuildConfig buildConfig)
+    {
+        ValidationResults.Clear();
+        Validate(buildConfig);
+    }
 
     /// <summary>
-    ///     Executes/apply this build step. (In the context of a BUILD action)
-    ///     There is also a button to ONLY APPLY steps, and not _make_ an actual build.
+    ///     Validate the prerequisites for this build step.
+    ///     Add messages to ValidationResults. If any messages have ERROR severity,
+    ///     the build button will be disabled.
     /// </summary>
     /// <param name="buildConfig"></param>
-    /// <param name="options"></param>
-    /// <returns></returns>
-    public abstract void Apply(BuildConfig buildConfig, BuildOptionWrapper options);
+    protected abstract void Validate(BuildConfig buildConfig);
 }
 }

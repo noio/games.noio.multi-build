@@ -1,31 +1,29 @@
-// (C)2025 @noio_games
+// (C)2026 @noio_games
 // Thomas van den Berg
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using UnityEditor;
 using UnityEditor.Rendering;
 using UnityEditorInternal;
 using UnityEngine;
+using Debug = UnityEngine.Debug;
 
 namespace noio.MultiBuild
 {
 [CustomEditor(typeof(BuildConfig))]
 public class BuildConfigEditor : Editor
 {
-    static readonly Lazy<GUIStyle> MiniButtonStyle = new(
-        () => new GUIStyle(GUI.skin.button)
-        {
-            padding = new RectOffset(0, 0, 0, 0)
-        });
+    static readonly Lazy<GUIStyle> MiniButtonStyle = new(() => new GUIStyle(GUI.skin.button)
+    {
+        padding = new RectOffset(0, 0, 0, 0)
+    });
 
-    static readonly Lazy<GUIContent> ErrorIcon = new(
-        () => EditorGUIUtility.IconContent("Error"));
-
-    static readonly Lazy<GUIContent> WarningIcon = new(
-        () => EditorGUIUtility.IconContent("Warning"));
+    static readonly Lazy<GUIContent> ErrorIcon = new(() => EditorGUIUtility.IconContent("Error"));
+    static readonly Lazy<GUIContent> WarningIcon = new(() => EditorGUIUtility.IconContent("Warning"));
 
     static readonly Lazy<GUIContent> FileExistsWarningIcon = new(() =>
     {
@@ -42,12 +40,19 @@ public class BuildConfigEditor : Editor
         wordWrap = true
     });
 
-    readonly List<StepEntry> _stepEntries = new();
+    static readonly Lazy<GUIStyle> HeaderStyle = new(() => new GUIStyle(EditorStyles.boldLabel)
+    {
+        fontSize = 16
+    });
+
+    readonly List<StepEntry> _preBuildStepEntries = new();
+    readonly List<StepEntry> _postBuildStepEntries = new();
     SerializedProperty _script;
     SerializedProperty _outputFolder;
     SerializedProperty _customPath;
     SerializedProperty _targets;
-    SerializedProperty _steps;
+    SerializedProperty _preBuildSteps;
+    SerializedProperty _postBuildSteps;
     ReorderableList _targetsList;
     BuildConfig _buildConfig;
     bool _showHelp;
@@ -62,7 +67,8 @@ public class BuildConfigEditor : Editor
         _outputFolder = serializedObject.FindProperty("_outputFolder");
         _customPath = serializedObject.FindProperty("_customPath");
         _targets = serializedObject.FindProperty("_targets");
-        _steps = serializedObject.FindProperty("_steps");
+        _preBuildSteps = serializedObject.FindProperty("_preBuildSteps");
+        _postBuildSteps = serializedObject.FindProperty("_postBuildSteps");
 
         _targetsList = new ReorderableList(serializedObject, _targets, false, true, true, true)
         {
@@ -74,7 +80,8 @@ public class BuildConfigEditor : Editor
             elementHeight = 60
         };
 
-        RebuildStepsList();
+        RebuildPreBuildStepsList();
+        RebuildPostBuildStepsList();
         ValidateAll();
     }
 
@@ -99,7 +106,7 @@ public class BuildConfigEditor : Editor
         //  (__' |__  |  |  | |__)
         //  .__) |__  |  \__/ |
         //
-        GUILayout.Label("Setup", EditorStyles.boldLabel);
+        GUILayout.Label("Setup", HeaderStyle.Value);
         using (var changes = new EditorGUI.ChangeCheckScope())
         {
             DrawOutputFolderSelect();
@@ -148,58 +155,24 @@ public class BuildConfigEditor : Editor
 
         EditorGUILayout.Space();
 
-        //   __  ___  __  __   __            __  ___
-        //  (__'  |  |__ |__) (__'    |   | (__'  |
-        //  .__)  |  |__ |    .__)    |__ | .__)  |
-        //
+        GUILayout.Label("Before Build", HeaderStyle.Value);
+        DrawStepsList(_preBuildStepEntries, _preBuildSteps, "Pre-Build");
+        DrawAddStepButton<PreBuildStep>(_preBuildStepEntries, _preBuildSteps, "Pre-Build");
 
-        using (var changes = new EditorGUI.ChangeCheckScope())
-        {
-            for (var index = 0; index < _stepEntries.Count; index++)
-            {
-                DrawStep(index);
-            }
+        GUILayout.Space(20);
+        GUILayout.Label("After Build", HeaderStyle.Value);
+        DrawStepsList(_postBuildStepEntries, _postBuildSteps, "Post-Build");
+        DrawAddStepButton<PostBuildStep>(_postBuildStepEntries, _postBuildSteps, "Post-Build");
 
-            if (changes.changed)
-            {
-                serializedObject.ApplyModifiedProperties();
-            }
-        }
-
-        if (_steps.arraySize > 0)
-        {
-            CoreEditorUtils.DrawSplitter();
-        }
-        else
-        {
-            EditorGUILayout.HelpBox("No pre-build steps have been added.", MessageType.Info);
-        }
-
-        EditorGUILayout.Space();
-
-        using (var horizontalScope = new EditorGUILayout.HorizontalScope())
-        {
-            if (EditorGUILayout.DropdownButton(new GUIContent("Add Pre-Build Step"), FocusType.Keyboard,
-                    EditorStyles.miniButton))
-            {
-                var rect = horizontalScope.rect;
-                ShowAddBuildStepPopup(rect, _steps, BuildStepOrder.PreBuild);
-            }
-        }
-
-        //   __              __      __       ___ ___  __
-        //  |__) |  | | |   |  \    |__) |  |  |   |  /  \ |\ |
-        //  |__) \__/ | |__ |__/    |__) \__/  |   |  \__/ | \|
-        //
-        // GUILayout.Space(20);
-        // if (GUILayout.Button("Re-Validate"))
-        // {
-        //     ValidateAll();
-        // }
-        //
         GUILayout.Space(40);
-        var hasAnyErrors = _stepEntries.Any(entry =>
-            entry.IsValid && entry.Messages.Any(msg => msg.Severity == Severity.Error));
+        var hasAnyErrors = _preBuildStepEntries.Any(entry =>
+                               entry.IsValid &&
+                               entry.BuildStep.ValidationResults.Any(msg =>
+                                   msg.Severity == Severity.Error)) ||
+                           _postBuildStepEntries.Any(entry =>
+                               entry.IsValid &&
+                               entry.BuildStep.ValidationResults.Any(msg => msg.Severity == Severity.Error));
+
         using (new EditorGUI.DisabledScope(hasAnyErrors))
         {
             using (new EditorGUILayout.HorizontalScope())
@@ -228,10 +201,11 @@ public class BuildConfigEditor : Editor
                         {
                             var buildPath = _buildConfig.GetPathForTarget(currentTarget);
                             var execPath = GetExecutablePath(buildPath, currentTarget);
-                            if (string.IsNullOrEmpty(execPath) == false && (File.Exists(execPath) || Directory.Exists(execPath)))
+                            if (string.IsNullOrEmpty(execPath) == false &&
+                                (File.Exists(execPath) || Directory.Exists(execPath)))
                             {
                                 Debug.Log($"Running build at: {execPath}");
-                                System.Diagnostics.Process.Start(execPath);
+                                Process.Start(execPath);
                             }
                             else
                             {
@@ -249,29 +223,34 @@ public class BuildConfigEditor : Editor
 
     void ValidateAll()
     {
-        foreach (var entry in _stepEntries)
+        foreach (var entry in _preBuildStepEntries)
         {
             if (entry.IsValid)
             {
-                entry.Messages.Clear();
-                entry.Step.Validate(_buildConfig, entry.Messages);
+                entry.BuildStep.RunValidation(_buildConfig);
+            }
+        }
+
+        foreach (var entry in _postBuildStepEntries)
+        {
+            if (entry.IsValid)
+            {
+                entry.BuildStep.RunValidation(_buildConfig);
             }
         }
 
         _queueValidate = false;
     }
 
-    void DrawStep(int index)
+    void DrawStep(StepEntry stepEntry, Action<Vector2> contextAction)
     {
-        var stepEntry = _stepEntries[index];
-
         CoreEditorUtils.DrawSplitter();
 
         if (stepEntry.IsValid == false)
         {
             CoreEditorUtils.DrawHeaderFoldout(new GUIContent("Not Found"),
                 true,
-                contextAction: v => OnContextClick(v, index));
+                contextAction: contextAction);
 
             EditorGUILayout.HelpBox(
                 "Build Step was NULL. This can be caused by renaming a BuildStep class. " +
@@ -284,22 +263,22 @@ public class BuildConfigEditor : Editor
             /*
              * DRAW BUILD STEP FOLDOUT HEADER
              */
-            var step = stepEntry.Step;
+            var step = stepEntry.BuildStep;
             var stepSO = stepEntry.SerializedObject;
             var activeProp = stepSO.FindProperty("_active");
 
             var isExpanded = CoreEditorUtils.DrawHeaderToggle(
                 step.DisplayName, stepEntry.SerializedProperty, activeProp,
-                v => OnContextClick(v, index));
+                contextAction);
 
             var iconRect = GUILayoutUtility.GetLastRect();
             iconRect.xMin = iconRect.xMax - 40;
             iconRect.width = 20;
-            if (stepEntry.Messages.Any(msg => msg.Severity == Severity.Error))
+            if (step.ValidationResults.Any(msg => msg.Severity == Severity.Error))
             {
                 EditorGUI.LabelField(iconRect, ErrorIcon.Value);
             }
-            else if (stepEntry.Messages.Any(msg => msg.Severity == Severity.Warning))
+            else if (step.ValidationResults.Any(msg => msg.Severity == Severity.Warning))
             {
                 EditorGUI.LabelField(iconRect, WarningIcon.Value);
             }
@@ -310,8 +289,8 @@ public class BuildConfigEditor : Editor
             if (isExpanded)
             {
                 EditorGUILayout.Space();
-                
-                foreach (var msg in stepEntry.Messages)
+
+                foreach (var msg in step.ValidationResults)
                 {
                     var didFix = DrawMessage(msg);
                     if (didFix)
@@ -326,14 +305,14 @@ public class BuildConfigEditor : Editor
                 {
                     using (new EditorGUI.DisabledScope(activeProp is { boolValue: false }))
                     {
-                        // Iterate child properties of the sub-asset
+                        /* Iterate child properties of the sub-asset */
                         var iterator = stepSO.GetIterator();
                         var enterChildren = true;
                         while (iterator.NextVisible(enterChildren))
                         {
                             enterChildren = false;
 
-                            // Hide script field and the _active (drawn in header toggle)
+                            /* Hide script field and the _active (drawn in header toggle) */
                             if (iterator.propertyPath == "m_Script" || iterator.propertyPath == "_active")
                             {
                                 continue;
@@ -356,6 +335,98 @@ public class BuildConfigEditor : Editor
         EditorGUILayout.Space();
     }
 
+    void DrawStepsList(
+        List<StepEntry> stepEntries,
+        SerializedProperty stepsProperty,
+        string label
+    )
+    {
+        EditorGUILayout.Space(6);
+        using (var changes = new EditorGUI.ChangeCheckScope())                           
+        {
+            for (var index = 0; index < stepEntries.Count; index++)
+            {
+                var capturedIndex = index;
+                DrawStep(stepEntries[index],
+                    v => OnStepContextClick(v, capturedIndex, stepEntries, stepsProperty));
+            }
+
+            if (changes.changed)
+            {
+                serializedObject.ApplyModifiedProperties();
+            }
+        }
+
+        if (stepsProperty.arraySize > 0)
+        {
+            CoreEditorUtils.DrawSplitter();
+        }
+        else
+        {
+            EditorGUILayout.HelpBox($"No {label.ToLower()} steps have been added.", MessageType.Info);
+        }
+
+        EditorGUILayout.Space();
+    }
+
+    void DrawAddStepButton<T>(
+        List<StepEntry> stepEntries,
+        SerializedProperty stepsProperty,
+        string label
+    ) where T : BuildStep
+    {
+        void ShowAddStepPopup(Rect rect)
+        {
+            var menu = new GenericMenu();
+
+            var stepTypes = TypeCache.GetTypesDerivedFrom<T>()
+                                     .Where(t => t.IsAbstract == false && t.IsGenericTypeDefinition == false)
+                                     .OrderBy(t => GetBuildStepDisplayName(t));
+
+            foreach (var type in stepTypes)
+            {
+                var displayName = GetBuildStepDisplayName(type);
+                menu.AddItem(new GUIContent(displayName), false, () =>
+                {
+                    var config = (BuildConfig)target;
+                    var path = AssetDatabase.GetAssetPath(config);
+
+                    Undo.RecordObject(config, $"Add {label} Step");
+
+                    var step = (BuildStep)CreateInstance(type);
+                    step.name = type.Name;
+                    step.hideFlags = HideFlags.HideInHierarchy;
+
+                    AssetDatabase.AddObjectToAsset(step, config);
+                    AssetDatabase.ImportAsset(path);
+                    EditorUtility.SetDirty(step);
+                    EditorUtility.SetDirty(config);
+
+                    var idx = stepsProperty.arraySize;
+                    stepsProperty.InsertArrayElementAtIndex(idx);
+                    stepsProperty.GetArrayElementAtIndex(idx).objectReferenceValue = step;
+
+                    serializedObject.ApplyModifiedProperties();
+                    AssetDatabase.SaveAssets();
+
+                    RebuildStepsList(stepEntries, stepsProperty);
+                });
+            }
+
+            menu.DropDown(rect);
+        }
+
+        using (var horizontalScope = new EditorGUILayout.HorizontalScope())
+        {
+            if (EditorGUILayout.DropdownButton(new GUIContent($"Add {label} Step"), FocusType.Keyboard,
+                    EditorStyles.miniButton))
+            {
+                var rect = horizontalScope.rect;
+                ShowAddStepPopup(rect);
+            }
+        }
+    }
+
     static void IncrementVersion()
     {
         var currentVersion = Application.version;
@@ -374,16 +445,26 @@ public class BuildConfigEditor : Editor
         }
     }
 
-    void RebuildStepsList()
+    void RebuildPreBuildStepsList()
     {
-        _stepEntries.Clear();
-        for (var i = 0; i < _steps.arraySize; i++)
+        RebuildStepsList(_preBuildStepEntries, _preBuildSteps);
+    }
+
+    void RebuildPostBuildStepsList()
+    {
+        RebuildStepsList(_postBuildStepEntries, _postBuildSteps);
+    }
+
+    void RebuildStepsList(List<StepEntry> stepEntries, SerializedProperty stepsProperty)
+    {
+        stepEntries.Clear();
+        for (var i = 0; i < stepsProperty.arraySize; i++)
         {
-            var entry = new StepEntry(_steps.GetArrayElementAtIndex(i));
-            _stepEntries.Add(entry);
+            var entry = new StepEntry(stepsProperty.GetArrayElementAtIndex(i));
+            stepEntries.Add(entry);
             if (entry.IsValid)
             {
-                entry.Step.hideFlags = HideFlags.HideInHierarchy;
+                entry.BuildStep.hideFlags = HideFlags.HideInHierarchy;
             }
         }
     }
@@ -399,9 +480,13 @@ public class BuildConfigEditor : Editor
         return ObjectNames.NicifyVariableName(typeName);
     }
 
-    void OnContextClick(Vector2 position, int index)
+    void OnStepContextClick(
+        Vector2 position,
+        int index,
+        List<StepEntry> stepEntries,
+        SerializedProperty stepsProperty
+    )
     {
-        // var targetComponent = targetEditor.target;
         var menu = new GenericMenu();
 
         if (index == 0)
@@ -411,12 +496,13 @@ public class BuildConfigEditor : Editor
         }
         else
         {
-            menu.AddItem(EditorGUIUtility.TrTextContent("Move to Top"), false, () => MoveStep(index, 0));
+            menu.AddItem(EditorGUIUtility.TrTextContent("Move to Top"), false,
+                () => MoveStep(index, 0, stepEntries, stepsProperty));
             menu.AddItem(EditorGUIUtility.TrTextContent("Move Up"), false,
-                () => MoveStep(index, index - 1));
+                () => MoveStep(index, index - 1, stepEntries, stepsProperty));
         }
 
-        if (index == _steps.arraySize - 1)
+        if (index == stepsProperty.arraySize - 1)
         {
             menu.AddDisabledItem(EditorGUIUtility.TrTextContent("Move to Bottom"));
             menu.AddDisabledItem(EditorGUIUtility.TrTextContent("Move Down"));
@@ -424,65 +510,43 @@ public class BuildConfigEditor : Editor
         else
         {
             menu.AddItem(EditorGUIUtility.TrTextContent("Move to Bottom"), false,
-                () => MoveStep(index, _steps.arraySize - 1));
+                () => MoveStep(index, stepsProperty.arraySize - 1, stepEntries, stepsProperty));
             menu.AddItem(EditorGUIUtility.TrTextContent("Move Down"), false,
-                () => MoveStep(index, index + 1));
+                () => MoveStep(index, index + 1, stepEntries, stepsProperty));
         }
 
-        //
-        // menu.AddSeparator(string.Empty);
-        // menu.AddItem(EditorGUIUtility.TrTextContent("Collapse All"), false, () => CollapseComponents());
-        // menu.AddItem(EditorGUIUtility.TrTextContent("Expand All"), false, () => ExpandComponents());
-        // menu.AddSeparator(string.Empty);
-        // menu.AddItem(EditorGUIUtility.TrTextContent("Reset"), false, () => ResetComponent(targetComponent.GetType(), index));
-
-        menu.AddItem(EditorGUIUtility.TrTextContent("Remove"), false, () => RemoveStep(index));
-
-        // menu.AddItem(EditorGUIUtility.TrTextContent("Edit Script"), false, () => );
-
-        // menu.AddSeparator(string.Empty);
-        // if (targetEditor.hasAdditionalProperties)
-        //     menu.AddItem(EditorGUIUtility.TrTextContent("Show Additional Properties"), targetEditor.showAdditionalProperties, () => targetEditor.showAdditionalProperties ^= true);
-        // else
-        //     menu.AddDisabledItem(EditorGUIUtility.TrTextContent("Show Additional Properties"));
-        // menu.AddItem(EditorGUIUtility.TrTextContent("Show All Additional Properties..."), false, () => CoreRenderPipelinePreferences.Open());
-        //
-        // menu.AddSeparator(string.Empty);
-        // menu.AddItem(EditorGUIUtility.TrTextContent("Copy Settings"), false, () => CopySettings(targetComponent));
-        //
-        // if (CanPaste(targetComponent))
-        //     menu.AddItem(EditorGUIUtility.TrTextContent("Paste Settings"), false, () => PasteSettings(targetComponent));
-        // else
-        //     menu.AddDisabledItem(EditorGUIUtility.TrTextContent("Paste Settings"));
-        //
-        // menu.AddSeparator(string.Empty);
-        // menu.AddItem(EditorGUIUtility.TrTextContent("Toggle All"), false, () => m_Editors[index].SetAllOverridesTo(true));
-        // menu.AddItem(EditorGUIUtility.TrTextContent("Toggle None"), false, () => m_Editors[index].SetAllOverridesTo(false));
+        menu.AddItem(EditorGUIUtility.TrTextContent("Remove"), false,
+            () => RemoveStep(index, stepEntries, stepsProperty));
 
         menu.DropDown(new Rect(position, Vector2.zero));
     }
 
-    void MoveStep(int index, int destinationIndex)
+    void MoveStep(
+        int index,
+        int destinationIndex,
+        List<StepEntry> stepEntries,
+        SerializedProperty stepsProperty
+    )
     {
         serializedObject.Update();
-        _steps.MoveArrayElement(index, destinationIndex);
+        stepsProperty.MoveArrayElement(index, destinationIndex);
         serializedObject.ApplyModifiedProperties();
 
-        RebuildStepsList();
+        RebuildStepsList(stepEntries, stepsProperty);
     }
 
-    void RemoveStep(int index)
+    void RemoveStep(int index, List<StepEntry> stepEntries, SerializedProperty stepsProperty)
     {
         serializedObject.Update();
 
-        var prop = _steps.GetArrayElementAtIndex(index);
+        var prop = stepsProperty.GetArrayElementAtIndex(index);
         var obj = prop.objectReferenceValue as BuildStep;
 
-        // First null the reference in the list
-        _steps.DeleteArrayElementAtIndex(index);
+        /* First null the reference in the list */
+        stepsProperty.DeleteArrayElementAtIndex(index);
         serializedObject.ApplyModifiedProperties();
 
-        // Then destroy the sub-asset so it doesn't orphan
+        /* Then destroy the sub-asset so it doesn't orphan */
         if (obj != null)
         {
             Undo.RecordObject(target, "Remove Build Step");
@@ -494,7 +558,7 @@ public class BuildConfigEditor : Editor
             AssetDatabase.SaveAssets();
         }
 
-        RebuildStepsList();
+        RebuildStepsList(stepEntries, stepsProperty);
     }
 
     void ShowAddTargetPopup(Rect rect)
@@ -522,68 +586,6 @@ public class BuildConfigEditor : Editor
         menu.DropDown(rect);
     }
 
-    void ShowAddBuildStepPopup(Rect rect, SerializedProperty stepsList, BuildStepOrder order)
-    {
-        var menu = new GenericMenu();
-
-        var currentSteps = new List<BuildStep>();
-        for (var i = 0; i < stepsList.arraySize; i++)
-        {
-            currentSteps.Add(stepsList.GetArrayElementAtIndex(i).objectReferenceValue as BuildStep);
-        }
-
-        var stepTypes = TypeCache.GetTypesDerivedFrom<BuildStep>()
-                                 .Where(t => t.IsAbstract == false && t.IsGenericTypeDefinition == false)
-                                 .OrderBy(t => GetBuildStepDisplayName(t));
-
-        foreach (var type in stepTypes)
-        {
-            var attr = type.GetCustomAttributes(typeof(BuildStepAttribute), true)
-                           .Cast<BuildStepAttribute>()
-                           .FirstOrDefault();
-
-            // Order filter: if no attribute, allow in any menu
-            var okOrder = (attr == null && order == BuildStepOrder.PreBuild) ||
-                          (attr != null && attr.Order == (attr.Order | order));
-
-            // Multiplicity: if no attribute, allow multiple by default
-            var stepExists = currentSteps.Any(s => s && s.GetType() == type);
-            var okMultiplicity = stepExists == false || (attr != null && attr.AllowMultiple);
-
-            if (okOrder && okMultiplicity)
-            {
-                var label = GetBuildStepDisplayName(type);
-                menu.AddItem(new GUIContent(label), false, () =>
-                {
-                    var config = (BuildConfig)target;
-                    var path = AssetDatabase.GetAssetPath(config);
-
-                    Undo.RecordObject(config, "Add Build Step");
-
-                    var step = (BuildStep)CreateInstance(type);
-                    step.name = type.Name;
-                    step.hideFlags = HideFlags.HideInHierarchy;
-
-                    AssetDatabase.AddObjectToAsset(step, config);
-                    AssetDatabase.ImportAsset(path);
-                    EditorUtility.SetDirty(step);
-                    EditorUtility.SetDirty(config);
-
-                    var idx = stepsList.arraySize;
-                    stepsList.InsertArrayElementAtIndex(idx);
-                    stepsList.GetArrayElementAtIndex(idx).objectReferenceValue = step;
-
-                    serializedObject.ApplyModifiedProperties();
-                    AssetDatabase.SaveAssets();
-
-                    RebuildStepsList();
-                });
-            }
-        }
-
-        menu.DropDown(rect);
-    }
-
     static bool OpenFolderPanelRelativeToProject(ref string folder)
     {
         var path = Path.Combine(Application.dataPath, folder);
@@ -600,11 +602,11 @@ public class BuildConfigEditor : Editor
 
     #region INSPECTOR DRAWING ELEMENTS
 
-    static bool DrawMessage(BuildStepMessage message)
+    static bool DrawMessage(BuildStepValidationResult validationResult)
     {
         using (new EditorGUILayout.HorizontalScope(EditorStyles.helpBox))
         {
-            var iconContent = message.Severity switch
+            var iconContent = validationResult.Severity switch
             {
                 Severity.Info    => WarningIcon.Value,
                 Severity.Warning => WarningIcon.Value,
@@ -614,14 +616,14 @@ public class BuildConfigEditor : Editor
 
             GUILayout.Label(iconContent);
 
-            GUILayout.Label(message.Message, MessageStyle.Value);
+            GUILayout.Label(validationResult.Message, MessageStyle.Value);
             GUILayout.FlexibleSpace();
 
-            if (message.FixAction != null)
+            if (validationResult.FixAction != null)
             {
-                if (GUILayout.Button(message.FixActionName, GUILayout.MinWidth(120)))
+                if (GUILayout.Button(validationResult.FixActionName, GUILayout.MinWidth(120)))
                 {
-                    message.FixAction();
+                    validationResult.FixAction();
                     return true;
                 }
             }
@@ -804,21 +806,20 @@ internal class StepEntry
     public StepEntry(SerializedProperty stepProperty)
     {
         SerializedProperty = stepProperty;
-        Step = stepProperty.objectReferenceValue as BuildStep;
-        if (Step != null)
+        BuildStep = stepProperty.objectReferenceValue as BuildStep;
+
+        if (BuildStep != null)
         {
-            SerializedObject = new SerializedObject(Step);
-            Messages = new List<BuildStepMessage>();
+            SerializedObject = new SerializedObject(BuildStep);
         }
     }
 
     #region PROPERTIES
 
     public SerializedProperty SerializedProperty { get; }
-    public bool IsValid => Step != null;
-    public BuildStep Step { get; set; }
+    public bool IsValid => BuildStep != null;
+    public BuildStep BuildStep { get; set; }
     public SerializedObject SerializedObject { get; set; }
-    public List<BuildStepMessage> Messages { get; set; }
 
     #endregion
 }

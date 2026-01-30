@@ -11,6 +11,7 @@ using UnityEditor.Build.Reporting;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.Assertions;
+using UnityEngine.Serialization;
 
 // using UnityEditor.AddressableAssets.Settings;
 
@@ -24,7 +25,8 @@ public class BuildConfig : ScriptableObject
     [SerializeField] string _outputFolder;
     [SerializeField] string _customPath = "{date} {name}/{target}";
     [SerializeField] List<BuildTarget> _targets;
-    [SerializeField] List<BuildStep> _steps;
+    [FormerlySerializedAs("_steps")] [SerializeField] List<PreBuildStep> _preBuildSteps;
+    [SerializeField] List<PostBuildStep> _postBuildSteps;
 
     #endregion
 
@@ -180,7 +182,7 @@ public class BuildConfig : ScriptableObject
                 (targetsInOrder[currentTargetIdx], targetsInOrder[0]);
         }
 
-        //  __   __      __              __ 
+        //  __   __      __              __
         // |  \ /  \    |__) |  | | |   |  \
         // |__/ \__/    |__) \__/ | |__ |__/
         //
@@ -189,6 +191,8 @@ public class BuildConfig : ScriptableObject
          */
         var allBuildsSucceeded = true;
         var successLogs = new List<string>();
+        var postBuildStepResultsPerTarget = new List<List<BuildStepValidationResult>>();
+
         foreach (var target in targetsInOrder)
         {
             if (target != EditorUserBuildSettings.activeBuildTarget)
@@ -208,6 +212,9 @@ public class BuildConfig : ScriptableObject
                 throw new Exception($"Refusing to build into any folder named 'Assets': {path}");
             }
 
+            /*
+             * DO THE ACTUAL BUILD:
+             */
             var buildPlayerOptions = new BuildPlayerOptions
             {
                 target = target,
@@ -225,17 +232,38 @@ public class BuildConfig : ScriptableObject
                 break;
             }
 
+            /*
+             * Execute post-build steps
+             */
+            var results = new List<BuildStepValidationResult>();
+            postBuildStepResultsPerTarget.Add(results);
+            foreach (var step in _postBuildSteps)
+            {
+                if (step != null && step.Active)
+                {
+                    step.Execute(this, target, report, results);
+                }
+            }
+
             var buildTime = report.summary.totalTime.TotalSeconds;
             var buildSize = report.summary.totalSize / 1024 / 1024;
             var timeStamp = DateTime.Now.ToString("HH:mm");
-            var color = ColorUtility.ToHtmlStringRGB(new Color(0.6f, 1f, 0.58f));
 
-            /*
-             * Log a short message, log full message later
-             */
-            Debug.Log($"Build {target} v{Application.version} successful!");
-            successLogs.Add(
-                $"[{timeStamp}] <b><color=#{color}>Build {target} v{Application.version} successful!</color></b> ({buildTime:.0}s) {buildSize}MB. At {path}");
+            if (results.Any(r => r.Severity == Severity.Error ))
+            {
+                Debug.LogError($"Build {target} v{Application.version} post-build checks failed!");
+                allBuildsSucceeded = false;
+            }
+            else
+            {
+                var successColor = ColorUtility.ToHtmlStringRGB(new Color(0.6f, 1f, 0.58f));
+                /*
+                 * Log a short message, log full message later
+                 */
+                Debug.Log($"Build {target} v{Application.version} successful!");
+                successLogs.Add(
+                    $"[{timeStamp}] <b><color=#{successColor}>Build {target} v{Application.version} successful!</color></b> ({buildTime:.0}s) {buildSize}MB. At {path}");
+            }
 
             EditorUtility.ClearProgressBar();
         }
@@ -259,13 +287,28 @@ public class BuildConfig : ScriptableObject
         }
 
         /*
-         * Log the success messages after (again)
-         * because they tend to get snowed under by a bunch
-         * of unity warnings and other logs after each build.
+         * Log the final summary messages
+         * Success and failure messages are logged again because they tend to get
+         * snowed under by a bunch of unity warnings and other logs after each build.
          */
         foreach (var message in successLogs)
         {
             Debug.Log(message);
+        }
+
+        for (int i = 0; i < targetsInOrder.Count; i++)
+        {
+            var target = targetsInOrder[i];
+            var results = postBuildStepResultsPerTarget[i];
+            if (results.Count > 0)
+            {
+                Debug.Log($"Post-build checks for <b>{target} v{Application.version}</b>");
+                foreach (var result in results)
+                {
+                    result.Log();
+                }
+            }
+            
         }
 
         return allBuildsSucceeded;
@@ -275,7 +318,7 @@ public class BuildConfig : ScriptableObject
     {
         var options = new BuildOptionWrapper();
 
-        foreach (var buildStep in _steps)
+        foreach (var buildStep in _preBuildSteps)
         {
             if (buildStep.Active)
             {
