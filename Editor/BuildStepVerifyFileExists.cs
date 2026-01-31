@@ -94,11 +94,11 @@ public class BuildStepVerifyFileExists : PostBuildStep
             results.Add(new BuildStepValidationResult(Severity.Error,
                 $"[Verify {(_targetType)} Exists] {_targetType} not found: {fullPath}"));
         }
-        else
-        {
-            results.Add(new BuildStepValidationResult(Severity.Info,
-                $"[Verify {(_targetType)} Exists] {_targetType} exists: {fullPath}"));
-        }
+        // else
+        // {
+        //     results.Add(new BuildStepValidationResult(Severity.Info,
+        //         $"[Verify {(_targetType)} Exists] {_targetType} exists: {fullPath}"));
+        // }
     }
 
     enum Location

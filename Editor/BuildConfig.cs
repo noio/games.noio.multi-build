@@ -190,7 +190,6 @@ public class BuildConfig : ScriptableObject
          * Do the actual builds
          */
         var allBuildsSucceeded = true;
-        var successLogs = new List<string>();
         var postBuildStepResultsPerTarget = new List<List<BuildStepValidationResult>>();
 
         foreach (var target in targetsInOrder)
@@ -251,7 +250,7 @@ public class BuildConfig : ScriptableObject
 
             if (results.Any(r => r.Severity == Severity.Error ))
             {
-                Debug.LogError($"Build {target} v{Application.version} post-build checks failed!");
+                Debug.LogError($"[{timeStamp}] Build {target} v{Application.version} post-build checks failed!");
                 allBuildsSucceeded = false;
             }
             else
@@ -261,8 +260,8 @@ public class BuildConfig : ScriptableObject
                  * Log a short message, log full message later
                  */
                 Debug.Log($"Build {target} v{Application.version} successful!");
-                successLogs.Add(
-                    $"[{timeStamp}] <b><color=#{successColor}>Build {target} v{Application.version} successful!</color></b> ({buildTime:.0}s) {buildSize}MB. At {path}");
+                results.Add(new BuildStepValidationResult(Severity.Info,
+                    $"[{timeStamp}] <b><color=#{successColor}>Build {target} v{Application.version} successful!</color></b> ({buildTime:.0}s) {buildSize}MB. At {path}"));
             }
 
             EditorUtility.ClearProgressBar();
@@ -291,24 +290,18 @@ public class BuildConfig : ScriptableObject
          * Success and failure messages are logged again because they tend to get
          * snowed under by a bunch of unity warnings and other logs after each build.
          */
-        foreach (var message in successLogs)
-        {
-            Debug.Log(message);
-        }
-
         for (int i = 0; i < targetsInOrder.Count; i++)
         {
             var target = targetsInOrder[i];
             var results = postBuildStepResultsPerTarget[i];
             if (results.Count > 0)
             {
-                Debug.Log($"Post-build checks for <b>{target} v{Application.version}</b>");
+                Debug.Log($"Build Results for <b>{target} v{Application.version}</b>");
                 foreach (var result in results)
                 {
                     result.Log();
                 }
             }
-            
         }
 
         return allBuildsSucceeded;
